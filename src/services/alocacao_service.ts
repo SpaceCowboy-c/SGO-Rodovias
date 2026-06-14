@@ -16,7 +16,7 @@ class AlocacaoService {
             quantidade = 4;
         }
 
-        const ordenados = [...tecnicos].sort(
+        const ordenados = [...tecnicos].sort( 
             (a, b) =>
                 (b.competencias[ocorrencia.grupo_tarefa] || 0) -
                 (a.competencias[ocorrencia.grupo_tarefa] || 0)
