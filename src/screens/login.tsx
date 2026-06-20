@@ -12,39 +12,77 @@ import {
     Platform,
     KeyboardAvoidingView,
     Image,
+    ActivityIndicator,
 } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-const roadIcon = require('../../assets/image.png'); 
+const roadIcon = require('../../assets/image.png');
 
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const navigation = useNavigation();
+    const navigation: any = useNavigation();
 
     const handleLogin = async () => {
-        if (!email || !password) {
+        if (!email.trim() || !password.trim()) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            setLoading(true);
 
-        if (error) {
-            Alert.alert('Erro', 'Email ou senha inválidos.');
-            return;
+            // Login no Supabase Auth
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                Alert.alert('Erro', 'Email ou senha inválidos.');
+                return;
+            }
+
+            if (!data.user) {
+                Alert.alert('Erro', 'Usuário não encontrado.');
+                return;
+            }
+
+            // Busca role na tabela perfil
+            const { data: perfil, error: perfilError } = await supabase
+                .from('perfil')
+                .select('role')
+                .eq('id', data.user.id)
+                .single();
+
+            if (perfilError) {
+                Alert.alert('Erro', 'Perfil do usuário não encontrado.');
+                return;
+            }
+
+            // Navega para Home enviando role
+            navigation.navigate('Home' as any, {
+                role: perfil.role,
+                userId: data.user.id,
+            } as any);
+        } catch (err) {
+            Alert.alert('Erro', 'Ocorreu um erro ao fazer login.');
+            console.log(err);
+        } finally {
+            setLoading(false);
         }
-
-        navigation.navigate('Home' as never); 
     };
+
     return (
-        <LinearGradient colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']} style={styles.container}>
+        <LinearGradient
+            colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']}
+            style={styles.container}
+        >
             <View style={[styles.wave, styles.waveBack]} />
             <View style={[styles.wave, styles.waveFront]} />
 
@@ -53,38 +91,62 @@ export default function Login() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <Text style={styles.title}>SGO-Rodovias</Text>
-                <Image source={roadIcon} style={styles.avatar} resizeMode="contain" />
 
+                <Image
+                    source={roadIcon}
+                    style={styles.avatar}
+                    resizeMode="contain"
+                />
+
+                {/* Campo Email */}
                 <View style={styles.inputGroup}>
                     <TextInput
                         style={styles.input}
                         placeholder="Email"
                         placeholderTextColor="#1c3d5a"
                         autoCapitalize="none"
+                        keyboardType="email-address"
                         value={email}
                         onChangeText={setEmail}
                     />
                 </View>
 
+                {/* Campo Senha */}
                 <View style={styles.inputGroup}>
                     <View style={styles.passwordRow}>
                         <TextInput
                             style={[styles.input, { flex: 1, borderBottomWidth: 0 }]}
                             secureTextEntry={!showPassword}
-                            placeholder="Password"
+                            placeholder="Senha"
                             placeholderTextColor="#1c3d5a"
                             autoCapitalize="none"
                             value={password}
                             onChangeText={setPassword}
                         />
-                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={18} color="#1c3d5a" />
+
+                        <TouchableOpacity
+                            onPress={() => setShowPassword(!showPassword)}
+                        >
+                            <Ionicons
+                                name={showPassword ? 'eye-off' : 'eye'}
+                                size={18}
+                                color="#1c3d5a"
+                            />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                    <Text style={styles.buttonText}>Login</Text>
+                {/* Botão Login */}
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={handleLogin}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.buttonText}>Login</Text>
+                    )}
                 </TouchableOpacity>
             </KeyboardAvoidingView>
         </LinearGradient>
@@ -92,9 +154,17 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, overflow: 'hidden' },
+    container: {
+        flex: 1,
+        overflow: 'hidden',
+    },
 
-    formWrapper: { flex: 1, justifyContent: 'center', paddingHorizontal: 30, paddingTop: 280 },
+    formWrapper: {
+        flex: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 30,
+        paddingTop: 280,
+    },
 
     avatar: {
         position: 'absolute',
@@ -104,7 +174,6 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
     },
-
 
     title: {
         position: 'absolute',
@@ -117,9 +186,9 @@ const styles = StyleSheet.create({
         color: '#0d2b4e',
     },
 
-    inputGroup: { marginBottom: 20 },
-
-    label: { fontSize: 12, color: '#1c3d5a', marginBottom: -2 },
+    inputGroup: {
+        marginBottom: 20,
+    },
 
     input: {
         height: 40,
@@ -129,22 +198,14 @@ const styles = StyleSheet.create({
         color: '#1c3d5a',
         paddingHorizontal: 0,
         paddingVertical: 0,
-        textAlignVertical: 'center', // ajuda no Android a centralizar o texto
     },
 
-    passwordRow: {   // linha abaixo do input
+    passwordRow: {
         flexDirection: 'row',
         alignItems: 'center',
         borderBottomWidth: 1.2,
         borderBottomColor: '#1c3d5a',
     },
-
-    row: {
-        alignItems: 'flex-end',
-        marginBottom: 30,
-    },
-
-    rowText: { fontSize: 12, color: '#1c3d5a' },
 
     button: {
         height: 50,
@@ -153,10 +214,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 10,
-
     },
 
-    buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+    buttonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
 
     wave: {
         position: 'absolute',
@@ -167,7 +231,14 @@ const styles = StyleSheet.create({
         borderRadius: 300,
     },
 
-    waveBack: { backgroundColor: 'rgba(255,255,255,0.15)', transform: [{ rotate: '-8deg' }] },
+    waveBack: {
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        transform: [{ rotate: '-8deg' }],
+    },
 
-    waveFront: { backgroundColor: 'rgba(13,43,78,0.25)', bottom: -90, transform: [{ rotate: '6deg' }] },
+    waveFront: {
+        backgroundColor: 'rgba(13,43,78,0.25)',
+        bottom: -90,
+        transform: [{ rotate: '6deg' }],
+    },
 });

@@ -14,40 +14,80 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
-export default function OcorrenciasTecnico() {
-    const [ocorrencias, setOcorrencias] = useState<any[]>([]);
+export default function ListagemTecnicos() {
+    const [tecnicos, setTecnicos] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selecionada, setSelecionada] = useState<any>(null);
-    const [dificuldade, setDificuldade] = useState('');
-    const [tempoEstimado, setTempoEstimado] = useState('');
+    const [selecionado, setSelecionado] = useState<any>(null);
+    const [nome, setNome] = useState('');
+    const [cpf, setCpf] = useState('');
+    const [telefone, setTelefone] = useState('');
     const [successVisible, setSuccessVisible] = useState(false);
 
-    const fetchPendentes = async () => {
+    const fetchTecnicos = async () => {
         setLoading(true);
 
         const { data, error } = await supabase
-            .from('ocorrencia')
+            .from('tecnico')
             .select('*')
             .order('id', { ascending: false });
 
         if (error) {
-            console.log('Erro ao buscar ocorrências:', error.message);
+            console.log('Erro ao buscar técnicos:', error.message);
         } else {
-            console.log('Ocorrências carregadas:', data);
-            setOcorrencias(data || []);
+            console.log('Técnicos carregados:', data);
+            setTecnicos(data || []);
         }
 
         setLoading(false);
     };
 
     useEffect(() => {
-        fetchPendentes();
+        fetchTecnicos();
     }, []);
 
+    // Converte número puro (sem zeros à esquerda) em string com zeros à esquerda
+    const paraDigitos = (valor: any, tamanho: number) => {
+        if (valor == null) return '';
+        return String(valor).padStart(tamanho, '0');
+    };
+
+    const formatarCpf = (digitos: string) => {
+        if (digitos.length <= 3) return digitos;
+        if (digitos.length <= 6) return `${digitos.slice(0, 3)}.${digitos.slice(3)}`;
+        if (digitos.length <= 9) return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6)}`;
+        return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+    };
+
+    const formatarTelefone = (digitos: string) => {
+        if (digitos.length <= 2) return digitos;
+        if (digitos.length <= 7) return `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+        return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+    };
+
+    const handleCpfChange = (texto: string) => {
+        let valor = texto.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+        setCpf(formatarCpf(valor));
+    };
+
+    const handleTelefoneChange = (texto: string) => {
+        let valor = texto.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+        setTelefone(formatarTelefone(valor));
+    };
+
+    const abrirEdicao = (item: any) => {
+        setSelecionado(item);
+        setNome(item.nome ?? '');
+        setCpf(formatarCpf(paraDigitos(item.cpf, 11)));
+        setTelefone(formatarTelefone(paraDigitos(item.telefone, 11)));
+    };
+
     const fecharEdicao = () => {
-        setSelecionada(null);
-        setDificuldade('');
-        setTempoEstimado('');
+        setSelecionado(null);
+        setNome('');
+        setCpf('');
+        setTelefone('');
     };
 
     const handleOk = () => {
@@ -55,20 +95,29 @@ export default function OcorrenciasTecnico() {
     };
 
     const handleSalvar = async () => {
-        if (!dificuldade || !tempoEstimado) {
-            Alert.alert('Erro', 'Preencha dificuldade e tempo estimado.');
+        if (!nome || !cpf || !telefone) {
+            Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        console.log('Salvando ocorrência ID:', selecionada.id);
+        const cpfDigitos = cpf.replace(/\D/g, '');
+        const telefoneDigitos = telefone.replace(/\D/g, '');
+
+        if (cpfDigitos.length !== 11) {
+            Alert.alert('Erro', 'CPF inválido. Preencha os 11 dígitos.');
+            return;
+        }
+
+        console.log('Salvando técnico ID:', selecionado.id);
 
         const { error } = await supabase
-            .from('ocorrencia')
+            .from('tecnico')
             .update({
-                dificuldade: Number(dificuldade),
-                tempo_estimado: Number(tempoEstimado),
+                nome,
+                cpf: Number(cpfDigitos),
+                telefone: Number(telefoneDigitos),
             })
-            .eq('id', selecionada.id);
+            .eq('id', selecionado.id);
 
         if (error) {
             console.log('Erro ao salvar:', error.message);
@@ -78,31 +127,31 @@ export default function OcorrenciasTecnico() {
 
         fecharEdicao();
         setSuccessVisible(true);
-        fetchPendentes();
+        fetchTecnicos();
     };
 
-    const handleFinalizarChamado = (id: number) => {
+    const handleExcluirTecnico = (id: number) => {
         Alert.alert(
-            'Finalizar chamado',
-            'Tem certeza que deseja finalizar este chamado? Ele será removido da lista de ocorrências.',
+            'Excluir técnico',
+            'Tem certeza que deseja excluir este técnico? Essa ação não pode ser desfeita.',
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
-                    text: 'Finalizar',
+                    text: 'Excluir',
                     style: 'destructive',
                     onPress: async () => {
                         const { error } = await supabase
-                            .from('ocorrencia')
+                            .from('tecnico')
                             .delete()
                             .eq('id', id);
 
                         if (error) {
-                            console.log('Erro ao finalizar:', error.message);
-                            Alert.alert('Erro', 'Não foi possível finalizar o chamado.');
+                            console.log('Erro ao excluir:', error.message);
+                            Alert.alert('Erro', 'Não foi possível excluir o técnico.');
                             return;
                         }
 
-                        fetchPendentes();
+                        fetchTecnicos();
                     },
                 },
             ]
@@ -115,8 +164,8 @@ export default function OcorrenciasTecnico() {
                 colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']}
                 style={styles.header}
             >
-                <Text style={styles.title}>Ocorrências - Técnico</Text>
-                <Text style={styles.subtitle}>Pendentes de triagem</Text>
+                <Text style={styles.title}>Técnicos</Text>
+                <Text style={styles.subtitle}>Gerencie os técnicos cadastrados</Text>
             </LinearGradient>
 
             {loading ? (
@@ -127,71 +176,40 @@ export default function OcorrenciasTecnico() {
                 />
             ) : (
                 <FlatList
-                    data={ocorrencias}
+                    data={tecnicos}
                     keyExtractor={(item) => String(item.id)}
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={
                         <Text style={styles.empty}>
-                            Nenhuma ocorrência encontrada.
+                            Nenhum técnico encontrado.
                         </Text>
                     }
                     renderItem={({ item }) => {
-                        const ativo = item.status === 'ativo';
-
                         return (
                             <TouchableOpacity
                                 style={styles.card}
-                                onPress={() => {
-                                    setSelecionada(item);
-                                    setDificuldade(
-                                        item.dificuldade != null
-                                            ? String(item.dificuldade)
-                                            : ''
-                                    );
-                                    setTempoEstimado(
-                                        item.tempo_estimado != null
-                                            ? String(item.tempo_estimado)
-                                            : ''
-                                    );
-                                }}
+                                onPress={() => abrirEdicao(item)}
                             >
                                 <View style={styles.cardHeader}>
                                     <Text style={styles.cardTitle}>
-                                        Ocorrência #{item.id}
+                                        {item.nome}
                                     </Text>
-
-                                    <View
-                                        style={[
-                                            styles.badge,
-                                            { backgroundColor: ativo ? '#2ecc71' : '#9aa5b1' },
-                                        ]}
-                                    >
-                                        <Text style={styles.badgeText}>
-                                            {ativo ? 'Ativo' : 'Finalizado'}
-                                        </Text>
-                                    </View>
                                 </View>
 
                                 <Text style={styles.cardDescricao}>
-                                    {item.descricao}
+                                    CPF: {formatarCpf(paraDigitos(item.cpf, 11))}
                                 </Text>
 
                                 <Text style={styles.cardDescricao}>
-                                    Dificuldade:{' '}
-                                    {item.dificuldade ?? 'Não definida'}
-                                </Text>
-
-                                <Text style={styles.cardDescricao}>
-                                    Tempo estimado:{' '}
-                                    {item.tempo_estimado ?? 'Não definido'}
+                                    Telefone: {formatarTelefone(paraDigitos(item.telefone, 11))}
                                 </Text>
 
                                 <TouchableOpacity
                                     style={styles.finalizarButton}
-                                    onPress={() => handleFinalizarChamado(item.id)}
+                                    onPress={() => handleExcluirTecnico(item.id)}
                                 >
                                     <Text style={styles.finalizarButtonText}>
-                                        Finalizar chamado
+                                        Excluir técnico
                                     </Text>
                                 </TouchableOpacity>
                             </TouchableOpacity>
@@ -200,29 +218,37 @@ export default function OcorrenciasTecnico() {
                 />
             )}
 
-            <Modal visible={!!selecionada} transparent animationType="fade">
+            <Modal visible={!!selecionado} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>
-                            Preencher triagem
+                            Editar técnico
                         </Text>
 
                         <TextInput
                             style={styles.input}
-                            placeholder="Dificuldade (1 a 5)"
+                            placeholder="Nome"
                             placeholderTextColor="#9bb3c9"
-                            keyboardType="numeric"
-                            value={dificuldade}
-                            onChangeText={setDificuldade}
+                            value={nome}
+                            onChangeText={setNome}
                         />
 
                         <TextInput
                             style={[styles.input, { marginTop: 12 }]}
-                            placeholder="Tempo estimado (min)"
+                            placeholder="CPF"
                             placeholderTextColor="#9bb3c9"
                             keyboardType="numeric"
-                            value={tempoEstimado}
-                            onChangeText={setTempoEstimado}
+                            value={cpf}
+                            onChangeText={handleCpfChange}
+                        />
+
+                        <TextInput
+                            style={[styles.input, { marginTop: 12 }]}
+                            placeholder="Telefone"
+                            placeholderTextColor="#9bb3c9"
+                            keyboardType="numeric"
+                            value={telefone}
+                            onChangeText={handleTelefoneChange}
                         />
 
                         <View style={styles.modalActions}>
@@ -246,7 +272,7 @@ export default function OcorrenciasTecnico() {
                             <Ionicons name="checkmark" size={32} color="#fff" />
                         </View>
                         <Text style={styles.successModalTitle}>Atualizado!</Text>
-                        <Text style={styles.successModalText}>Triagem salva com sucesso.</Text>
+                        <Text style={styles.successModalText}>Técnico atualizado com sucesso.</Text>
                         <TouchableOpacity style={styles.modalButton} onPress={handleOk}>
                             <Text style={styles.modalButtonText}>OK</Text>
                         </TouchableOpacity>

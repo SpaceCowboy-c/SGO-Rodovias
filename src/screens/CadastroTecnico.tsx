@@ -7,130 +7,121 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
-const tiposProblema = ['Buraco', 'Sinalização', 'Iluminação', 'Outro'];
-
-export default function TelaOcorrencia() {
-    const [km, setKm] = useState('');
-    const [tipoProblema, setTipoProblema] = useState('');
-    const [descricao, setDescricao] = useState('');
-    const [data, setData] = useState('');
+export default function CadastroTecnico() {
+    const [cpf, setCpf] = useState('');
+    const [nome, setNome] = useState('');
+    const [telefone, setTelefone] = useState('');
     const [loading, setLoading] = useState(false);
     const [successVisible, setSuccessVisible] = useState(false);
 
     const handleOk = () => {
         setSuccessVisible(false);
-        setKm('');
-        setTipoProblema('');
-        setDescricao('');
-        setData('');
+        setCpf('');
+        setNome('');
+        setTelefone('');
+    };
+
+    const handleCpfChange = (texto: string) => {
+        let valor = texto.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+
+        let formatado = valor;
+        if (valor.length > 9) {
+            formatado = `${valor.slice(0, 3)}.${valor.slice(3, 6)}.${valor.slice(6, 9)}-${valor.slice(9)}`;
+        } else if (valor.length > 6) {
+            formatado = `${valor.slice(0, 3)}.${valor.slice(3, 6)}.${valor.slice(6)}`;
+        } else if (valor.length > 3) {
+            formatado = `${valor.slice(0, 3)}.${valor.slice(3)}`;
+        }
+
+        setCpf(formatado);
+    };
+
+    const handleTelefoneChange = (texto: string) => {
+        let valor = texto.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+
+        let formatado = valor;
+        if (valor.length > 7) {
+            formatado = `(${valor.slice(0, 2)}) ${valor.slice(2, 7)}-${valor.slice(7)}`;
+        } else if (valor.length > 2) {
+            formatado = `(${valor.slice(0, 2)}) ${valor.slice(2)}`;
+        }
+
+        setTelefone(formatado);
     };
 
     const handleCadastrar = async () => {
-        if (!km || !tipoProblema || !descricao || !data) {
+        if (!cpf || !nome || !telefone) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        const [dia, mes, ano] = data.split('/');
-        const dataFormatada = `${ano}-${mes}-${dia}`;
+        const cpfNumeros = cpf.replace(/\D/g, '');
+        if (cpfNumeros.length !== 11) {
+            Alert.alert('Erro', 'CPF inválido. Preencha os 11 dígitos.');
+            return;
+        }
 
         setLoading(true);
 
-        const { data: userData } = await supabase.auth.getUser();
-
-        const { error } = await supabase.from('ocorrencia').insert({
-            km: Number(km),
-            tipo_problema: tipoProblema,
-            descricao,
-            data: dataFormatada,
-            status: 'ativo',
-            criado_por: userData.user?.id,
+        const { error } = await supabase.from('tecnico').insert({
+            cpf: Number(cpfNumeros),
+            nome,
+            telefone: Number(telefone.replace(/\D/g, '')),
         });
 
         setLoading(false);
 
         if (error) {
             console.log('Erro Supabase:', error.message);
-            Alert.alert('Erro', 'Não foi possível cadastrar a ocorrência.');
+            Alert.alert('Erro', 'Não foi possível cadastrar o técnico.');
             return;
         }
 
         setSuccessVisible(true);
     };
 
-    const handleDataChange = (texto: string) => {
-        let valor = texto.replace(/\D/g, '');
-        if (valor.length > 8) valor = valor.slice(0, 8);
-
-        let formatado = valor;
-        if (valor.length > 4) {
-            formatado = `${valor.slice(0, 2)}/${valor.slice(2, 4)}/${valor.slice(4)}`;
-        } else if (valor.length > 2) {
-            formatado = `${valor.slice(0, 2)}/${valor.slice(2)}`;
-        }
-
-        setData(formatado);
-    };
-
     return (
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <LinearGradient colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']} style={styles.header}>
-                <Text style={styles.title}>Abrir Chamado</Text>
-                <Text style={styles.subtitle}>Conte pra gente o que encontrou na via</Text>
+                <Text style={styles.title}>Cadastro de Técnico</Text>
+                <Text style={styles.subtitle}>Preencha os dados do técnico</Text>
             </LinearGradient>
 
             <ScrollView contentContainerStyle={styles.form}>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>KM</Text>
+                    <Text style={styles.label}>Nome</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={nome}
+                        onChangeText={setNome}
+                        placeholder="Nome completo"
+                        placeholderTextColor="#9bb3c9"
+                    />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>CPF</Text>
                     <TextInput
                         style={styles.input}
                         keyboardType="numeric"
-                        value={km}
-                        onChangeText={setKm}
-                        placeholder="Ex: 45"
+                        value={cpf}
+                        onChangeText={handleCpfChange}
+                        placeholder="000.000.000-00"
                         placeholderTextColor="#9bb3c9"
                     />
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Tipo de Problema</Text>
-                    <View style={styles.chipsRow}>
-                        {tiposProblema.map((tipo) => (
-                            <TouchableOpacity
-                                key={tipo}
-                                style={[styles.chip, tipoProblema === tipo && styles.chipSelected]}
-                                onPress={() => setTipoProblema(tipo)}
-                            >
-                                <Text style={[styles.chipText, tipoProblema === tipo && styles.chipTextSelected]}>
-                                    {tipo}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Data</Text>
+                    <Text style={styles.label}>Telefone</Text>
                     <TextInput
                         style={styles.input}
-                        value={data}
-                        onChangeText={handleDataChange}
-                        placeholder="DD/MM/AAAA"
+                        keyboardType="numeric"
+                        value={telefone}
+                        onChangeText={handleTelefoneChange}
+                        placeholder="(00) 00000-0000"
                         placeholderTextColor="#9bb3c9"
-                    />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Descrição</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={descricao}
-                        onChangeText={setDescricao}
-                        placeholder="Descreva a ocorrência"
-                        placeholderTextColor="#9bb3c9"
-                        multiline
-                        numberOfLines={4}
-                        underlineColorAndroid="transparent"
                     />
                 </View>
 
@@ -145,8 +136,8 @@ export default function TelaOcorrencia() {
                         <View style={styles.modalIconCircle}>
                             <Ionicons name="checkmark" size={32} color="#fff" />
                         </View>
-                        <Text style={styles.modalTitle}>Chamado aberto!</Text>
-                        <Text style={styles.modalText}>Seu registro foi salvo com sucesso.</Text>
+                        <Text style={styles.modalTitle}>Técnico cadastrado!</Text>
+                        <Text style={styles.modalText}>O registro foi salvo com sucesso.</Text>
                         <TouchableOpacity style={styles.modalButton} onPress={handleOk}>
                             <Text style={styles.modalButtonText}>OK</Text>
                         </TouchableOpacity>
@@ -187,30 +178,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 12,
     },
-
-    textArea: {
-        minHeight: 90,
-        textAlignVertical: 'top',
-    },
-
-    chipsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-
-    chip: {
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        borderRadius: 20,
-        backgroundColor: '#eef1f5',
-    },
-
-    chipSelected: { backgroundColor: '#0d2b4e' },
-
-    chipText: { fontSize: 13, color: '#1c3d5a' },
-
-    chipTextSelected: { color: '#fff', fontWeight: 'bold' },
 
     button: {
         height: 50,

@@ -1,51 +1,90 @@
 // src/screens/home.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
-const menuItems = [
+const menuUser = [
     { label: 'Minhas Ocorrências', icon: 'people-outline', screen: 'TelaList' },
-    { label: 'Abrir nova Ocorrência', icon: 'alert-circle-outline', screen: 'Ocorrencia' },
+    { label: 'Abrir nova Ocorrência', icon: 'alert-circle-outline', screen: 'TelaOcorrencia' },
+    { label: 'Meu Perfil', icon: 'person-outline', screen: null }, // ainda não criada
+    { label: 'Configurações', icon: 'settings-outline', screen: null }, // ainda não criada
+];
+
+const menuTecnico = [
+    ...menuUser,
     { label: 'Ocorrências abertas', icon: 'alert-circle-outline', screen: 'TelaListTecnico' },
-    { label: 'Relatórios', icon: 'document-text-outline', screen: null },
+    { label: 'Cadastro Técnicos', icon: 'document-text-outline', screen: 'CadastroTecnico' },
+    { label: 'Listagem Técnicos', icon: 'document-text-outline', screen: 'ListagemTecnicos' },
+    { label: 'Relatórios', icon: 'bar-chart-outline', screen: null }, // ainda não criada
 ];
 
 export default function Home() {
+    const navigation: any = useNavigation();
+    const route: any = useRoute();
 
-    const navigation = useNavigation();
+    const role = route?.params?.role ?? 'user';
+
+    const menuItems = role === 'tecnico' ? menuTecnico : menuUser;
+
     const handlePress = (screen: string | null) => {
-        if (!screen) return; // tela ainda não implementada
-        navigation.navigate(screen as never);
+        if (!screen) return;
+
+        navigation.navigate(screen);
     };
-    
+
     return (
         <View style={styles.container}>
-            <LinearGradient colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']} style={styles.header}>
+            <LinearGradient
+                colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']}
+                style={styles.header}
+            >
                 <Text style={styles.title}>SGO-Rodovias</Text>
                 <Text style={styles.subtitle}>O que você precisa hoje?</Text>
             </LinearGradient>
 
             <ScrollView contentContainerStyle={styles.grid}>
-                {menuItems.map((item) => (
-                    <TouchableOpacity key={item.label} style={styles.card} onPress={() => handlePress(item.screen)}>
-                        <Ionicons name={item.icon as any} size={28} color="#0d2b4e" />
+                {menuItems.map((item, index) => (
+                    <TouchableOpacity
+                        key={`${item.label}-${index}`}
+                        style={styles.card}
+                        onPress={() => handlePress(item.screen)}
+                    >
+                        <Ionicons
+                            name={item.icon as any}
+                            size={28}
+                            color="#0d2b4e"
+                        />
                         <Text style={styles.cardText}>{item.label}</Text>
                     </TouchableOpacity>
                 ))}
             </ScrollView>
-            <LinearGradient colors={['#3a6cb5', '#5b8bd0', '#a9c6e8']} style={styles.footer}>
+
+            <LinearGradient
+                colors={['#3a6cb5', '#5b8bd0', '#a9c6e8']}
+                style={styles.footer}
+            >
                 <Ionicons name="location-outline" size={16} color="#fff" />
-                <Text style={styles.footerText}>Av Independência, 160, Relvado - RS</Text>
+                <Text style={styles.footerText}>
+                    Av Independência, 160, Relvado - RS
+                </Text>
             </LinearGradient>
-            
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f4f7fb' },
+    container: {
+        flex: 1,
+        backgroundColor: '#f4f7fb'
+    },
 
     header: {
         paddingTop: 70,
@@ -55,9 +94,19 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 30,
     },
 
-    title: { fontSize: 30, fontWeight: 'bold', color: '#0d2b4e', textAlign: 'center'},
+    title: {
+        fontSize: 30,
+        fontWeight: 'bold',
+        color: '#0d2b4e',
+        textAlign: 'center'
+    },
 
-    subtitle: { fontSize: 14, color: '#1c3d5a', marginTop: 4, textAlign: 'center' },
+    subtitle: {
+        fontSize: 14,
+        color: '#1c3d5a',
+        marginTop: 4,
+        textAlign: 'center'
+    },
 
     grid: {
         flexDirection: 'row',
@@ -82,7 +131,12 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
 
-    cardText: { marginTop: 8, fontSize: 13, fontWeight: '600', color: '#0d2b4e' },
+    cardText: {
+        marginTop: 8,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0d2b4e'
+    },
 
     footer: {
         height: 160,
@@ -100,5 +154,4 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
     },
-
 });
