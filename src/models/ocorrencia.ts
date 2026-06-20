@@ -6,8 +6,9 @@ export class ocorrencia{
     public tempo_estimado: number;
     public descricao: string;
     public data: Date;
+    public status: string;
 
-    constructor( id: number, km: number, grupo_tarefa: number, dificuldade: number,tempo_estimado: number,descricao: string, data: Date) {
+    constructor(id: number, km: number, grupo_tarefa: number, dificuldade: number, tempo_estimado: number, descricao: string, data: Date, status: string = 'ativo') {
         this.id = id;
         this.km = km;
         this.grupo_tarefa = grupo_tarefa;
@@ -15,5 +16,6 @@ export class ocorrencia{
         this.tempo_estimado = tempo_estimado;
         this.descricao = descricao;
         this.data = data;
+        this.status = status;
     }
 }
