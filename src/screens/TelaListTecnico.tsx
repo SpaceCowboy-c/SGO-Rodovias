@@ -4,110 +4,197 @@ import {
     Text,
     FlatList,
     TouchableOpacity,
-    StyleSheet,
-    ActivityIndicator,
     Modal,
     TextInput,
-    Alert,
+    StyleSheet,
+    Alert
 } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import AlocacaoService from '../services/alocacao_service';
 
 export default function OcorrenciasTecnico() {
     const [ocorrencias, setOcorrencias] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selecionada, setSelecionada] = useState<any>(null);
+    const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState<any>(null);
+
+    const [modalTriagem, setModalTriagem] = useState(false);
+    const [modalEquipe, setModalEquipe] = useState(false);
+
     const [dificuldade, setDificuldade] = useState('');
     const [tempoEstimado, setTempoEstimado] = useState('');
-    const [successVisible, setSuccessVisible] = useState(false);
 
-    const fetchPendentes = async () => {
-        setLoading(true);
+    const [equipeSelecionada, setEquipeSelecionada] = useState<any[]>([]);
 
+    useEffect(() => {
+        carregarOcorrencias();
+    }, []);
+
+    async function carregarOcorrencias() {
         const { data, error } = await supabase
             .from('ocorrencia')
             .select('*')
-            .order('id', { ascending: false });
+            .neq('status', 'finalizado');
 
         if (error) {
-            console.log('Erro ao buscar ocorrências:', error.message);
-        } else {
-            console.log('Ocorrências carregadas:', data);
-            setOcorrencias(data || []);
-        }
-
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        fetchPendentes();
-    }, []);
-
-    const fecharEdicao = () => {
-        setSelecionada(null);
-        setDificuldade('');
-        setTempoEstimado('');
-    };
-
-    const handleOk = () => {
-        setSuccessVisible(false);
-    };
-
-    const handleSalvar = async () => {
-        if (!dificuldade || !tempoEstimado) {
-            Alert.alert('Erro', 'Preencha dificuldade e tempo estimado.');
+            console.log(error);
+            Alert.alert('Erro', error.message);
             return;
         }
 
-        console.log('Salvando ocorrência ID:', selecionada.id);
+        setOcorrencias(data || []);
+    }
+
+    async function handleCardClick(ocorrencia: any) {
+        // Primeiro clique → triagem
+        if (!ocorrencia.dificuldade || !ocorrencia.tempo_estimado) {
+            setOcorrenciaSelecionada(ocorrencia);
+            setModalTriagem(true);
+            return;
+        }
+
+        // Segundo clique → algoritmo
+        const { data: tecnicos, error } = await supabase
+            .from('tecnico')
+            .select(`
+                *,
+                competencia (
+                    grupo_tarefa_id,
+                    nivel
+                )
+            `);
+
+        if (error || !tecnicos) {
+            console.log(error);
+            Alert.alert('Erro ao carregar técnicos');
+            return;
+        }
+
+        const tecnicosFormatados = tecnicos.map((t: any) => ({
+            ...t,
+            competencias: Object.fromEntries(
+                t.competencia.map((c: any) => [
+                    c.grupo_tarefa_id,
+                    c.nivel
+                ])
+            )
+        }));
+
+        const equipe = AlocacaoService.sugerirEquipe(
+            tecnicosFormatados,
+            ocorrencia
+        );
+
+        setEquipeSelecionada(equipe);
+        setModalEquipe(true);
+    }
+
+    async function salvarTriagem() {
+        if (!dificuldade || !tempoEstimado) {
+            Alert.alert('Erro', 'Preencha todos os campos.');
+            return;
+        }
+
+        const { data: grupos, error: grupoError } = await supabase
+            .from('grupo_tarefa')
+            .select('id, descricao')
+            .ilike('descricao', `%${ocorrenciaSelecionada.tipo_problema}%`);
+
+        if (grupoError || !grupos || grupos.length === 0) {
+            console.log(grupoError);
+            Alert.alert(
+                'Erro',
+                'Não foi possível localizar o grupo da tarefa.'
+            );
+            return;
+        }
 
         const { error } = await supabase
             .from('ocorrencia')
             .update({
                 dificuldade: Number(dificuldade),
                 tempo_estimado: Number(tempoEstimado),
+                grupo_tarefa_id: grupos[0].id
             })
-            .eq('id', selecionada.id);
+            .eq('id', ocorrenciaSelecionada.id);
 
         if (error) {
-            console.log('Erro ao salvar:', error.message);
-            Alert.alert('Erro', 'Não foi possível salvar.');
+            console.log(error);
+            Alert.alert('Erro ao salvar triagem');
             return;
         }
 
-        fecharEdicao();
-        setSuccessVisible(true);
-        fetchPendentes();
-    };
+        setModalTriagem(false);
+        setDificuldade('');
+        setTempoEstimado('');
+        carregarOcorrencias();
+    }
 
-    const handleFinalizarChamado = (id: number) => {
-        Alert.alert(
-            'Finalizar chamado',
-            'Tem certeza que deseja finalizar este chamado? Ele será removido da lista de ocorrências.',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Finalizar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        const { error } = await supabase
-                            .from('ocorrencia')
-                            .delete()
-                            .eq('id', id);
+    async function finalizarOcorrencia(id: number) {
+        const { error } = await supabase
+            .from('ocorrencia')
+            .update({
+                status: 'finalizado'
+            })
+            .eq('id', id);
 
-                        if (error) {
-                            console.log('Erro ao finalizar:', error.message);
-                            Alert.alert('Erro', 'Não foi possível finalizar o chamado.');
-                            return;
-                        }
+        if (error) {
+            console.log(error);
+            Alert.alert('Erro ao finalizar ocorrência');
+            return;
+        }
 
-                        fetchPendentes();
-                    },
-                },
-            ]
+        // Remove da lista, mas mantém no banco
+        setOcorrencias((prev) =>
+            prev.filter((ocorrencia) => ocorrencia.id !== id)
         );
-    };
+
+        Alert.alert('Sucesso', 'Ocorrência finalizada.');
+    }
+
+    const renderItem = ({ item }: any) => (
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => handleCardClick(item)}
+        >
+            <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>
+                    {item.tipo_problema}
+                </Text>
+
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                        {item.status}
+                    </Text>
+                </View>
+            </View>
+
+            <Text style={styles.cardDescricao}>
+                {item.descricao}
+            </Text>
+
+            <Text style={styles.cardInfo}>
+                KM: {item.km}
+            </Text>
+
+            <Text style={styles.cardInfo}>
+                Dificuldade: {item.dificuldade ?? 'Aguardando triagem'}
+            </Text>
+
+            <Text style={styles.cardInfo}>
+                Tempo: {item.tempo_estimado ?? 'Aguardando triagem'}
+            </Text>
+
+            <TouchableOpacity
+                style={styles.excluirButton}
+                onPress={() => finalizarOcorrencia(item.id)}
+            >
+                <Text style={styles.excluirButtonText}>
+                    Finalizar ocorrência
+                </Text>
+            </TouchableOpacity>
+        </TouchableOpacity>
+    );
 
     return (
         <View style={styles.container}>
@@ -115,102 +202,27 @@ export default function OcorrenciasTecnico() {
                 colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']}
                 style={styles.header}
             >
-                <Text style={styles.title}>Ocorrências - Técnico</Text>
-                <Text style={styles.subtitle}>Pendentes de triagem</Text>
+                <Text style={styles.title}>Ocorrências Técnicas</Text>
             </LinearGradient>
 
-            {loading ? (
-                <ActivityIndicator
-                    size="large"
-                    color="#0d2b4e"
-                    style={{ marginTop: 40 }}
-                />
-            ) : (
-                <FlatList
-                    data={ocorrencias}
-                    keyExtractor={(item) => String(item.id)}
-                    contentContainerStyle={styles.list}
-                    ListEmptyComponent={
-                        <Text style={styles.empty}>
-                            Nenhuma ocorrência encontrada.
-                        </Text>
-                    }
-                    renderItem={({ item }) => {
-                        const ativo = item.status === 'ativo';
+            <FlatList
+                data={ocorrencias}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderItem}
+                contentContainerStyle={styles.list}
+            />
 
-                        return (
-                            <TouchableOpacity
-                                style={styles.card}
-                                onPress={() => {
-                                    setSelecionada(item);
-                                    setDificuldade(
-                                        item.dificuldade != null
-                                            ? String(item.dificuldade)
-                                            : ''
-                                    );
-                                    setTempoEstimado(
-                                        item.tempo_estimado != null
-                                            ? String(item.tempo_estimado)
-                                            : ''
-                                    );
-                                }}
-                            >
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.cardTitle}>
-                                        Ocorrência #{item.id}
-                                    </Text>
-
-                                    <View
-                                        style={[
-                                            styles.badge,
-                                            { backgroundColor: ativo ? '#2ecc71' : '#9aa5b1' },
-                                        ]}
-                                    >
-                                        <Text style={styles.badgeText}>
-                                            {ativo ? 'Ativo' : 'Finalizado'}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                <Text style={styles.cardDescricao}>
-                                    {item.descricao}
-                                </Text>
-
-                                <Text style={styles.cardDescricao}>
-                                    Dificuldade:{' '}
-                                    {item.dificuldade ?? 'Não definida'}
-                                </Text>
-
-                                <Text style={styles.cardDescricao}>
-                                    Tempo estimado:{' '}
-                                    {item.tempo_estimado ?? 'Não definido'}
-                                </Text>
-
-                                <TouchableOpacity
-                                    style={styles.finalizarButton}
-                                    onPress={() => handleFinalizarChamado(item.id)}
-                                >
-                                    <Text style={styles.finalizarButtonText}>
-                                        Finalizar chamado
-                                    </Text>
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        );
-                    }}
-                />
-            )}
-
-            <Modal visible={!!selecionada} transparent animationType="fade">
+            {/* Modal Triagem */}
+            <Modal visible={modalTriagem} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>
-                            Preencher triagem
+                            Triagem da Ocorrência
                         </Text>
 
                         <TextInput
                             style={styles.input}
-                            placeholder="Dificuldade (1 a 5)"
-                            placeholderTextColor="#9bb3c9"
+                            placeholder="Dificuldade"
                             keyboardType="numeric"
                             value={dificuldade}
                             onChangeText={setDificuldade}
@@ -218,37 +230,56 @@ export default function OcorrenciasTecnico() {
 
                         <TextInput
                             style={[styles.input, { marginTop: 12 }]}
-                            placeholder="Tempo estimado (min)"
-                            placeholderTextColor="#9bb3c9"
+                            placeholder="Tempo estimado"
                             keyboardType="numeric"
                             value={tempoEstimado}
                             onChangeText={setTempoEstimado}
                         />
 
                         <View style={styles.modalActions}>
-                            <TouchableOpacity onPress={fecharEdicao}>
+                            <TouchableOpacity
+                                onPress={() => setModalTriagem(false)}
+                            >
                                 <Text style={styles.cancelText}>Cancelar</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.modalButton} onPress={handleSalvar}>
-                                <Text style={styles.modalButtonText}>Salvar</Text>
+                            <TouchableOpacity
+                                style={styles.modalButton}
+                                onPress={salvarTriagem}
+                            >
+                                <Text style={styles.modalButtonText}>
+                                    Salvar
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* Modal de sucesso, mesmo padrão da tela de Abrir Chamado */}
-            <Modal visible={successVisible} transparent animationType="fade">
+            {/* Modal Equipe */}
+            <Modal visible={modalEquipe} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
-                    <View style={styles.successModalCard}>
-                        <View style={styles.modalIconCircle}>
-                            <Ionicons name="checkmark" size={32} color="#fff" />
-                        </View>
-                        <Text style={styles.successModalTitle}>Atualizado!</Text>
-                        <Text style={styles.successModalText}>Triagem salva com sucesso.</Text>
-                        <TouchableOpacity style={styles.modalButton} onPress={handleOk}>
-                            <Text style={styles.modalButtonText}>OK</Text>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>
+                            Equipe Sugerida
+                        </Text>
+
+                        {equipeSelecionada.map((tecnico) => (
+                            <Text
+                                key={tecnico.id}
+                                style={styles.cardInfo}
+                            >
+                                • {tecnico.nome}
+                            </Text>
+                        ))}
+
+                        <TouchableOpacity
+                            style={[styles.modalButton, { marginTop: 20 }]}
+                            onPress={() => setModalEquipe(false)}
+                        >
+                            <Text style={styles.modalButtonText}>
+                                Fechar
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -258,10 +289,7 @@ export default function OcorrenciasTecnico() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f4f7fb',
-    },
+    container: { flex: 1, backgroundColor: '#f4f7fb' },
 
     header: {
         paddingTop: 70,
@@ -275,17 +303,11 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#0d2b4e',
-    },
-
-    subtitle: {
-        fontSize: 14,
-        color: '#1c3d5a',
-        marginTop: 4,
+        color: '#0d2b4e'
     },
 
     list: {
-        padding: 20,
+        padding: 20
     },
 
     card: {
@@ -310,31 +332,31 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 15,
         fontWeight: 'bold',
-        color: '#0d2b4e',
+        color: '#0d2b4e'
     },
 
     badge: {
         borderRadius: 20,
         paddingHorizontal: 10,
         paddingVertical: 4,
+        backgroundColor: '#2ecc71'
     },
 
     badgeText: {
         color: '#fff',
         fontSize: 12,
-        fontWeight: 'bold',
+        fontWeight: 'bold'
     },
 
     cardDescricao: {
         fontSize: 14,
         color: '#1c3d5a',
-        marginBottom: 4,
+        marginBottom: 6
     },
 
-    empty: {
-        textAlign: 'center',
-        marginTop: 40,
-        color: '#5a7287',
+    cardInfo: {
+        fontSize: 12,
+        color: '#5a7287'
     },
 
     modalOverlay: {
@@ -377,7 +399,7 @@ const styles = StyleSheet.create({
 
     cancelText: {
         color: '#5a7287',
-        fontSize: 14,
+        fontSize: 14
     },
 
     modalButton: {
@@ -390,44 +412,10 @@ const styles = StyleSheet.create({
     modalButtonText: {
         color: '#fff',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 14
     },
 
-    // Estilos do modal de sucesso, mesmo padrão da tela "Abrir Chamado"
-    successModalCard: {
-        width: '82%',
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        paddingVertical: 30,
-        paddingHorizontal: 24,
-        alignItems: 'center',
-    },
-
-    modalIconCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#3a6cb5',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 14,
-    },
-
-    successModalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#0d2b4e',
-        textAlign: 'center',
-    },
-
-    successModalText: {
-        fontSize: 14,
-        color: '#1c3d5a',
-        marginTop: 6,
-        textAlign: 'center',
-    },
-
-    finalizarButton: {
+    excluirButton: {
         marginTop: 10,
         backgroundColor: '#0d2b4e',
         borderRadius: 10,
@@ -435,7 +423,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 
-    finalizarButtonText: {
+    excluirButtonText: {
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 13,

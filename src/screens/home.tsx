@@ -19,11 +19,12 @@ const menuUser = [
 ];
 
 const menuTecnico = [
-    ...menuUser,
     { label: 'Ocorrências abertas', icon: 'alert-circle-outline', screen: 'TelaListTecnico' },
+    { label: 'Abrir nova Ocorrência', icon: 'alert-circle-outline', screen: 'TelaOcorrencia' },
     { label: 'Cadastro Técnicos', icon: 'document-text-outline', screen: 'CadastroTecnico' },
     { label: 'Listagem Técnicos', icon: 'document-text-outline', screen: 'ListagemTecnicos' },
     { label: 'Relatórios', icon: 'bar-chart-outline', screen: null }, // ainda não criada
+    { label: 'Meu Perfil', icon: 'person-outline', screen: null }, // ainda não criada
 ];
 
 export default function Home() {

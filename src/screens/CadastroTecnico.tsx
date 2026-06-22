@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     ScrollView, Alert, KeyboardAvoidingView, Platform, Modal,
@@ -7,6 +7,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
+type GrupoTarefa = {
+    id: number;
+    descricao: string;
+};
+
 export default function CadastroTecnico() {
     const [cpf, setCpf] = useState('');
     const [nome, setNome] = useState('');
@@ -14,11 +19,44 @@ export default function CadastroTecnico() {
     const [loading, setLoading] = useState(false);
     const [successVisible, setSuccessVisible] = useState(false);
 
+    // --- Competências dinâmicas ---
+    const [grupoTarefas, setGrupoTarefas] = useState<GrupoTarefa[]>([]);
+    const [niveis, setNiveis] = useState<Record<number, number>>({}); // { grupo_tarefa_id: nivel }
+    const [loadingGrupos, setLoadingGrupos] = useState(true);
+
+    useEffect(() => {
+        carregarGrupoTarefas();
+    }, []);
+
+    const carregarGrupoTarefas = async () => {
+        setLoadingGrupos(true);
+
+        const { data, error } = await supabase
+            .from('grupo_tarefa')
+            .select('id, descricao')
+            .order('descricao', { ascending: true });
+
+        setLoadingGrupos(false);
+
+        if (error) {
+            console.log('Erro ao buscar grupo_tarefa:', error.message);
+            Alert.alert('Erro', 'Não foi possível carregar as áreas de competência.');
+            return;
+        }
+
+        setGrupoTarefas(data ?? []);
+    };
+
+    const handleSelecionarNivel = (grupoId: number, nivel: number) => {
+        setNiveis((prev) => ({ ...prev, [grupoId]: nivel }));
+    };
+
     const handleOk = () => {
         setSuccessVisible(false);
         setCpf('');
         setNome('');
         setTelefone('');
+        setNiveis({});
     };
 
     const handleCpfChange = (texto: string) => {
@@ -63,22 +101,55 @@ export default function CadastroTecnico() {
             return;
         }
 
+        // Apenas as competências que o usuário de fato selecionou um nível
+        const competenciasSelecionadas = Object.entries(niveis).filter(
+            ([, nivel]) => nivel > 0
+        );
+
         setLoading(true);
 
-        const { error } = await supabase.from('tecnico').insert({
-            cpf: Number(cpfNumeros),
-            nome,
-            telefone: Number(telefone.replace(/\D/g, '')),
-        });
+        // 1) Cria o técnico e já recupera o id gerado
+        const { data: tecnicoData, error: tecnicoError } = await supabase
+            .from('tecnico')
+            .insert({
+                cpf: Number(cpfNumeros),
+                nome,
+                telefone: Number(telefone.replace(/\D/g, '')),
+            })
+            .select()
+            .single();
 
-        setLoading(false);
-
-        if (error) {
-            console.log('Erro Supabase:', error.message);
+        if (tecnicoError || !tecnicoData) {
+            setLoading(false);
+            console.log('Erro Supabase (tecnico):', tecnicoError?.message);
             Alert.alert('Erro', 'Não foi possível cadastrar o técnico.');
             return;
         }
 
+        // 2) Insere uma linha em competencia para cada grupo_tarefa selecionado
+        if (competenciasSelecionadas.length > 0) {
+            const linhas = competenciasSelecionadas.map(([grupoTarefaId, nivel]) => ({
+                tecnico_id: tecnicoData.id,
+                grupo_tarefa_id: Number(grupoTarefaId),
+                nivel,
+            }));
+
+            const { error: competenciaError } = await supabase
+                .from('competencia')
+                .insert(linhas);
+
+            if (competenciaError) {
+                console.log('Erro Supabase (competencia):', competenciaError.message);
+                Alert.alert(
+                    'Atenção',
+                    'Técnico cadastrado, mas houve um erro ao salvar as competências.'
+                );
+                setLoading(false);
+                return;
+            }
+        }
+
+        setLoading(false);
         setSuccessVisible(true);
     };
 
@@ -123,6 +194,51 @@ export default function CadastroTecnico() {
                         placeholder="(00) 00000-0000"
                         placeholderTextColor="#9bb3c9"
                     />
+                </View>
+
+                {/* --- Competências dinâmicas, vindas de grupo_tarefa --- */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Competências</Text>
+
+                    {loadingGrupos && (
+                        <Text style={styles.helperText}>Carregando áreas de competência...</Text>
+                    )}
+
+                    {!loadingGrupos && grupoTarefas.length === 0 && (
+                        <Text style={styles.helperText}>
+                            Nenhuma área cadastrada em grupo_tarefa ainda.
+                        </Text>
+                    )}
+
+                    {grupoTarefas.map((grupo) => (
+                        <View key={grupo.id} style={styles.competenciaRow}>
+                            <Text style={styles.competenciaLabel}>{grupo.descricao}</Text>
+                            <View style={styles.nivelRow}>
+                                {[1, 2, 3, 4, 5].map((n) => {
+                                    const selecionado = niveis[grupo.id] === n;
+                                    return (
+                                        <TouchableOpacity
+                                            key={n}
+                                            style={[
+                                                styles.nivelButton,
+                                                selecionado && styles.nivelButtonSelecionado,
+                                            ]}
+                                            onPress={() => handleSelecionarNivel(grupo.id, n)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.nivelButtonText,
+                                                    selecionado && styles.nivelButtonTextSelecionado,
+                                                ]}
+                                            >
+                                                {n}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    ))}
                 </View>
 
                 <TouchableOpacity style={styles.button} onPress={handleCadastrar} disabled={loading}>
@@ -177,6 +293,54 @@ const styles = StyleSheet.create({
         color: '#0d2b4e',
         paddingHorizontal: 15,
         paddingVertical: 12,
+    },
+
+    helperText: {
+        fontSize: 13,
+        color: '#5b7290',
+        fontStyle: 'italic',
+    },
+
+    competenciaRow: {
+        marginBottom: 14,
+    },
+
+    competenciaLabel: {
+        fontSize: 14,
+        color: '#0d2b4e',
+        marginBottom: 6,
+        fontWeight: '500',
+    },
+
+    nivelRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+
+    nivelButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: '#eef1f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#d8e1ea',
+    },
+
+    nivelButtonSelecionado: {
+        backgroundColor: '#0d2b4e',
+        borderColor: '#0d2b4e',
+    },
+
+    nivelButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#5b7290',
+    },
+
+    nivelButtonTextSelecionado: {
+        color: '#fff',
     },
 
     button: {

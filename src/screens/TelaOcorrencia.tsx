@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
-const tiposProblema = ['Buraco', 'Sinalização', 'Iluminação', 'Outro'];
+const tiposProblema = ['equipamentos','infraestrutura', 'Iluminação'];
 
 export default function TelaOcorrencia() {
     const [km, setKm] = useState('');

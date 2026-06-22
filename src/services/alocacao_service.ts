@@ -1,8 +1,7 @@
-import { tecnico} from '../models/tecnico';
-import {ocorrencia} from '../models/ocorrencia';
+import { tecnico } from '../models/tecnico';
+import { ocorrencia } from '../models/ocorrencia';
 
 class AlocacaoService {
-
     sugerirEquipe(
         tecnicos: tecnico[],
         ocorrencia: ocorrencia
@@ -12,16 +11,17 @@ class AlocacaoService {
 
         if (ocorrencia.dificuldade === 2) {
             quantidade = 2;
-        } else if (ocorrencia.dificuldade >= 3) {
+        } else if ((ocorrencia.dificuldade ?? 0) >= 3) {
             quantidade = 4;
         }
 
-        const ordenados = [...tecnicos].sort( 
-            (a, b) =>
-                (b.competencias[ocorrencia.grupo_tarefa] || 0) -
-                (a.competencias[ocorrencia.grupo_tarefa] || 0)
+        const ordenados = [...tecnicos].sort((a, b) =>
+            (b.competencias[ocorrencia.grupo_tarefa_id] || 0) -
+            (a.competencias[ocorrencia.grupo_tarefa_id] || 0)
         );
 
         return ordenados.slice(0, quantidade);
     }
 }
+
+export default new AlocacaoService();
