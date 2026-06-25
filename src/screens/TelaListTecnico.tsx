@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
+import { //import dos componentes 
     View,
     Text,
     FlatList,
@@ -11,26 +11,29 @@ import {
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import AlocacaoService from '../services/alocacao_service';
+import { buscarClima, ClimaInfo } from '../services/weatherService';
 
 export default function OcorrenciasTecnico() {
-    const [ocorrencias, setOcorrencias] = useState<any[]>([]);
-    const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState<any>(null);
+    const [ocorrencias, setOcorrencias] = useState<any[]>([]);  //lista o que vem do banco 
+    const [climas, setClimas] = useState<Record<number, ClimaInfo | null>>({});  //guarda o clima
+    const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState<any>(null); //qual ocorrencia foi clicada
 
-    const [modalTriagem, setModalTriagem] = useState(false);
+    const [modalTriagem, setModalTriagem] = useState(false);   // Controla abertura do modal de triagem
     const [modalEquipe, setModalEquipe] = useState(false);
 
-    const [dificuldade, setDificuldade] = useState('');
+    const [dificuldade, setDificuldade] = useState('');  //pega a dificulade que o usuario digitou
     const [tempoEstimado, setTempoEstimado] = useState('');
 
     const [equipeSelecionada, setEquipeSelecionada] = useState<any[]>([]);
 
-    useEffect(() => {
+    useEffect(() => {  //executa quando a tela é carregada
         carregarOcorrencias();
     }, []);
 
-    async function carregarOcorrencias() {
+    async function carregarOcorrencias() {  //busca a listagem das ocorrencias no banco de dados
         const { data, error } = await supabase
             .from('ocorrencia')
             .select('*')
@@ -43,18 +46,33 @@ export default function OcorrenciasTecnico() {
         }
 
         setOcorrencias(data || []);
+        carregarClimas(data || []); //busca o clima para cada ocorrência
     }
 
-    async function handleCardClick(ocorrencia: any) {
-        // Primeiro clique → triagem
+    async function carregarClimas(lista: any[]) {  //busca o clima para cada ocorrência
+        const resultados: Record<number, ClimaInfo | null> = {};  //objeto para armazenar
+
+        await Promise.all(
+            lista.map(async (item) => {
+                if (item.latitude != null && item.longitude != null) {  //se achar localização
+                    resultados[item.id] = await buscarClima(item.latitude, item.longitude); //busca o clima
+                } else {
+                    resultados[item.id] = null;
+                }
+            })
+        );
+        // Atualiza estado
+        setClimas(resultados);
+    }
+
+    async function handleCardClick(ocorrencia: any) {    // Quando o técnico clica no card
         if (!ocorrencia.dificuldade || !ocorrencia.tempo_estimado) {
             setOcorrenciaSelecionada(ocorrencia);
             setModalTriagem(true);
             return;
         }
 
-        // Segundo clique → algoritmo
-        const { data: tecnicos, error } = await supabase
+        const { data: tecnicos, error } = await supabase   // Busca técnicos + competências
             .from('tecnico')
             .select(`
                 *,
@@ -70,7 +88,7 @@ export default function OcorrenciasTecnico() {
             return;
         }
 
-        const tecnicosFormatados = tecnicos.map((t: any) => ({
+        const tecnicosFormatados = tecnicos.map((t: any) => ({    // Formata competências em objeto
             ...t,
             competencias: Object.fromEntries(
                 t.competencia.map((c: any) => [
@@ -80,22 +98,22 @@ export default function OcorrenciasTecnico() {
             )
         }));
 
-        const equipe = AlocacaoService.sugerirEquipe(
-            tecnicosFormatados,
+        const equipe = AlocacaoService.sugerirEquipe(  // Chama algoritmo de alocação
+            tecnicosFormatados, 
             ocorrencia
         );
 
-        setEquipeSelecionada(equipe);
+        setEquipeSelecionada(equipe);  //salva a equipe selecionada
         setModalEquipe(true);
     }
 
-    async function salvarTriagem() {
+    async function salvarTriagem() {  //salvar dados da triagem
         if (!dificuldade || !tempoEstimado) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        const { data: grupos, error: grupoError } = await supabase
+        const { data: grupos, error: grupoError } = await supabase   // Busca grupo de tarefa relacionado
             .from('grupo_tarefa')
             .select('id, descricao')
             .ilike('descricao', `%${ocorrenciaSelecionada.tipo_problema}%`);
@@ -109,7 +127,7 @@ export default function OcorrenciasTecnico() {
             return;
         }
 
-        const { error } = await supabase
+        const { error } = await supabase   // Atualiza ocorrência no banco
             .from('ocorrencia')
             .update({
                 dificuldade: Number(dificuldade),
@@ -124,13 +142,13 @@ export default function OcorrenciasTecnico() {
             return;
         }
 
-        setModalTriagem(false);
+        setModalTriagem(false);  //fecha o modal
         setDificuldade('');
         setTempoEstimado('');
-        carregarOcorrencias();
+        carregarOcorrencias();  //recarrega a lista 
     }
 
-    async function finalizarOcorrencia(id: number) {
+    async function finalizarOcorrencia(id: number) {    // Atualiza status
         const { error } = await supabase
             .from('ocorrencia')
             .update({
@@ -144,59 +162,75 @@ export default function OcorrenciasTecnico() {
             return;
         }
 
-        // Remove da lista, mas mantém no banco
-        setOcorrencias((prev) =>
+        setOcorrencias((prev) =>  // Remove da tela
             prev.filter((ocorrencia) => ocorrencia.id !== id)
         );
 
         Alert.alert('Sucesso', 'Ocorrência finalizada.');
     }
 
-    const renderItem = ({ item }: any) => (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={() => handleCardClick(item)}
-        >
-            <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>
-                    {item.tipo_problema}
-                </Text>
+    const renderItem = ({ item }: any) => {  // Renderiza cada card da lista
+        const clima = climas[item.id];
 
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                        {item.status}
-                    </Text>
-                </View>
-            </View>
-
-            <Text style={styles.cardDescricao}>
-                {item.descricao}
-            </Text>
-
-            <Text style={styles.cardInfo}>
-                KM: {item.km}
-            </Text>
-
-            <Text style={styles.cardInfo}>
-                Dificuldade: {item.dificuldade ?? 'Aguardando triagem'}
-            </Text>
-
-            <Text style={styles.cardInfo}>
-                Tempo: {item.tempo_estimado ?? 'Aguardando triagem'}
-            </Text>
-
+        return (
             <TouchableOpacity
-                style={styles.excluirButton}
-                onPress={() => finalizarOcorrencia(item.id)}
+                style={styles.card}
+                onPress={() => handleCardClick(item)}
             >
-                <Text style={styles.excluirButtonText}>
-                    Finalizar ocorrência
-                </Text>
-            </TouchableOpacity>
-        </TouchableOpacity>
-    );
+                <View style={styles.cardHeader}>  {/* Cabeçalho */}
+                    <Text style={styles.cardTitle}>
+                        {item.tipo_problema}
+                    </Text>
 
-    return (
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>
+                            {item.status}
+                        </Text>
+                    </View>
+                </View>
+
+                <Text style={styles.cardDescricao}>
+                    {item.descricao}
+                </Text>
+
+                <Text style={styles.cardInfo}>
+                    KM: {item.km}
+                </Text>
+
+                <Text style={styles.cardInfo}>
+                    Dificuldade: {item.dificuldade ?? 'Aguardando triagem'}
+                </Text>
+
+                <Text style={styles.cardInfo}>
+                    Tempo: {item.tempo_estimado ?? 'Aguardando triagem'}
+                </Text>
+
+                {clima ? (
+                    <View style={styles.climaRow}>
+                        <Ionicons name={clima.icon} size={16} color="#3a6cb5" />
+                        <Text style={styles.climaText}>
+                            {clima.temperatura}°C • {clima.descricao}
+                        </Text>
+                    </View>
+                ) : item.latitude != null ? (
+                    <Text style={styles.cardInfo}>Carregando clima...</Text>
+                ) : (
+                    <Text style={styles.cardInfo}>Localização não disponível</Text>
+                )}
+
+                <TouchableOpacity
+                    style={styles.excluirButton}
+                    onPress={() => finalizarOcorrencia(item.id)}
+                >
+                    <Text style={styles.excluirButtonText}>
+                        Finalizar ocorrência
+                    </Text>
+                </TouchableOpacity>
+            </TouchableOpacity>
+        );
+    };
+
+    return (      // Estrutura da tela
         <View style={styles.container}>
             <LinearGradient
                 colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']}
@@ -212,7 +246,6 @@ export default function OcorrenciasTecnico() {
                 contentContainerStyle={styles.list}
             />
 
-            {/* Modal Triagem */}
             <Modal visible={modalTriagem} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
@@ -256,7 +289,6 @@ export default function OcorrenciasTecnico() {
                 </View>
             </Modal>
 
-            {/* Modal Equipe */}
             <Modal visible={modalEquipe} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
@@ -357,6 +389,19 @@ const styles = StyleSheet.create({
     cardInfo: {
         fontSize: 12,
         color: '#5a7287'
+    },
+
+    climaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+
+    climaText: {
+        fontSize: 12,
+        color: '#3a6cb5',
+        fontWeight: '600',
     },
 
     modalOverlay: {

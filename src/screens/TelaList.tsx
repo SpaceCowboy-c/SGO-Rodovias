@@ -20,16 +20,17 @@ export default function MinhasOcorrencias() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    //campos na hora da edição
     const [selecionada, setSelecionada] = useState<any>(null);
     const [km, setKm] = useState('');
     const [tipoProblema, setTipoProblema] = useState('');
     const [descricao, setDescricao] = useState('');
     const [successVisible, setSuccessVisible] = useState(false);
 
-    const fetchMinhas = async () => {
+    const fetchMinhas = async () => {  //busca as ocorrências
         const { data: userData } = await supabase.auth.getUser();
 
-        const { data, error } = await supabase
+        const { data, error } = await supabase //select na tabela ocorrencia
             .from('ocorrencia')
             .select('*')
             .order('id', { ascending: false });
@@ -42,37 +43,37 @@ export default function MinhasOcorrencias() {
     };
 
     useEffect(() => { fetchMinhas(); }, []);
-
-    const formatarData = (iso: string) => {
+ 
+    const formatarData = (iso: string) => {     // Formata data do banco /do que vem do banco
         const [ano, mes, dia] = iso.split('-');
         return `${dia}/${mes}/${ano}`;
     };
 
-    const abrirEdicao = (item: any) => {
+    const abrirEdicao = (item: any) => {  //abre o model de edição com os campos preenchidos
         setSelecionada(item);
         setKm(item.km != null ? String(item.km) : '');
         setTipoProblema(item.tipo_problema ?? '');
         setDescricao(item.descricao ?? '');
     };
 
-    const fecharEdicao = () => {
+    const fecharEdicao = () => {   
         setSelecionada(null);
         setKm('');
         setTipoProblema('');
         setDescricao('');
     };
 
-    const handleOk = () => {
+    const handleOk = () => {  // Fecha modal de sucesso
         setSuccessVisible(false);
     };
 
-    const handleSalvar = async () => {
+    const handleSalvar = async () => {  //salva as alterações feitas na ocorrência selecionada
         if (!km || !tipoProblema || !descricao) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        const { error } = await supabase
+        const { error } = await supabase     // Atualiza no banco
             .from('ocorrencia')
             .update({
                 km: Number(km),
@@ -92,29 +93,8 @@ export default function MinhasOcorrencias() {
         fetchMinhas();
     };
 
-    const renderItem = ({ item }: { item: any }) => {
-        const ativo = item.status === 'ativo';
-        return (
-            <TouchableOpacity style={styles.card} onPress={() => abrirEdicao(item)}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>KM {item.km} • {item.tipo_problema}</Text>
-                    <View style={[styles.badge, { backgroundColor: ativo ? '#2ecc71' : '#9aa5b1' }]}>
-                        <Text style={styles.badgeText}>{ativo ? 'Ativo' : 'Finalizado'}</Text>
-                    </View>
-                </View>
-                <Text style={styles.cardDescricao}>{item.descricao}</Text>
-                <Text style={styles.cardInfo}>{formatarData(item.data)}</Text>
-                <TouchableOpacity
-                    style={styles.excluirButton}
-                    onPress={() => handleExcluir(item.id)}
-                >
-                    <Text style={styles.excluirButtonText}>Excluir chamado</Text>
-                </TouchableOpacity>
-            </TouchableOpacity>
-        );
-    };
-
-    const handleExcluir = (id: number) => {
+    
+    const handleExcluir = (id: number) => {  //excluir ocorencia 
         Alert.alert(
             'Excluir chamado',
             'Tem certeza que deseja excluir este chamado? Essa ação não pode ser desfeita.',
@@ -124,7 +104,7 @@ export default function MinhasOcorrencias() {
                     text: 'Excluir',
                     style: 'destructive',
                     onPress: async () => {
-                        const { error } = await supabase
+                        const { error } = await supabase //deleta no banco
                             .from('ocorrencia')
                             .delete()
                             .eq('id', id);
@@ -135,14 +115,42 @@ export default function MinhasOcorrencias() {
                             return;
                         }
 
-                        fetchMinhas();
+                        // Remove da lista local na hora
+                        setOcorrencias((prev) =>
+                            prev.filter((ocorrencia) => ocorrencia.id !== id)
+                        );
                     },
                 },
             ]
         );
     };
 
-    return (
+    const renderItem = ({ item }: { item: any }) => {
+        const ativo = item.status === 'ativo';  // Verifica status
+        return (
+            <View style={styles.card}>
+                <TouchableOpacity onPress={() => abrirEdicao(item)} activeOpacity={0.7}>  
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle}>KM {item.km} • {item.tipo_problema}</Text>
+                        <View style={[styles.badge, { backgroundColor: ativo ? '#2ecc71' : '#9aa5b1' }]}>
+                            <Text style={styles.badgeText}>{ativo ? 'Ativo' : 'Finalizado'}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.cardDescricao}>{item.descricao}</Text>
+                    <Text style={styles.cardInfo}>{formatarData(item.data)}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.excluirButton}
+                    onPress={() => handleExcluir(item.id)}  
+                >
+                    <Text style={styles.excluirButtonText}>Excluir chamado</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    return ( //interface da tela
         <View style={styles.container}>
             <LinearGradient colors={['#a9c6e8', '#5b8bd0', '#3a6cb5']} style={styles.header}>
                 <Text style={styles.title}>Minhas Ocorrências</Text>
@@ -205,7 +213,6 @@ export default function MinhasOcorrencias() {
                 </View>
             </Modal>
 
-            {/* Modal de sucesso, mesmo padrão da tela de Abrir Chamado */}
             <Modal visible={successVisible} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.successModalCard}>

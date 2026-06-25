@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
+
 import Login from './src/screens/login';
 import Home from './src/screens/home';
 import TelaList from './src/screens/TelaList';
@@ -9,7 +10,7 @@ import CadastroTecnico from './src/screens/CadastroTecnico';
 import ListagemTecnicos from './src/screens/ListagemTecnicos';
 import TelaOcorrencia from './src/screens/TelaOcorrencia';
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
 export default function App() {
   return (

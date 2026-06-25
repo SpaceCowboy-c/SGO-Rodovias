@@ -18,15 +18,16 @@ export default function ListagemTecnicos() {
     const [tecnicos, setTecnicos] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selecionado, setSelecionado] = useState<any>(null);
+    //campos para edição
     const [nome, setNome] = useState('');
     const [cpf, setCpf] = useState('');
     const [telefone, setTelefone] = useState('');
     const [successVisible, setSuccessVisible] = useState(false);
 
-    const fetchTecnicos = async () => {
+    const fetchTecnicos = async () => {  
         setLoading(true);
 
-        const { data, error } = await supabase
+        const { data, error } = await supabase  // Busca todos os técnicos no banco
             .from('tecnico')
             .select('*')
             .order('id', { ascending: false });
@@ -45,7 +46,7 @@ export default function ListagemTecnicos() {
         fetchTecnicos();
     }, []);
 
-    // Converte número puro (sem zeros à esquerda) em string com zeros à esquerda
+    //Garante quantidade fixa de dígitos (ex: CPF com zeros à esquerda)
     const paraDigitos = (valor: any, tamanho: number) => {
         if (valor == null) return '';
         return String(valor).padStart(tamanho, '0');
@@ -76,7 +77,7 @@ export default function ListagemTecnicos() {
         setTelefone(formatarTelefone(valor));
     };
 
-    const abrirEdicao = (item: any) => {
+    const abrirEdicao = (item: any) => {  //abre tela de edição
         setSelecionado(item);
         setNome(item.nome ?? '');
         setCpf(formatarCpf(paraDigitos(item.cpf, 11)));
@@ -90,11 +91,11 @@ export default function ListagemTecnicos() {
         setTelefone('');
     };
 
-    const handleOk = () => {
+    const handleOk = () => {  //fecha o modal
         setSuccessVisible(false);
     };
 
-    const handleSalvar = async () => {
+    const handleSalvar = async () => {   // Salva alterações no banco
         if (!nome || !cpf || !telefone) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
@@ -110,7 +111,7 @@ export default function ListagemTecnicos() {
 
         console.log('Salvando técnico ID:', selecionado.id);
 
-        const { error } = await supabase
+        const { error } = await supabase   // Atualiza técnico no Supabase
             .from('tecnico')
             .update({
                 nome,
@@ -125,12 +126,12 @@ export default function ListagemTecnicos() {
             return;
         }
 
-        fecharEdicao();
+        fecharEdicao();   // Fecha modal e atualiza lista
         setSuccessVisible(true);
         fetchTecnicos();
     };
 
-    const handleExcluirTecnico = (id: number) => {
+    const handleExcluirTecnico = (id: number) => {   //aba de excluir
         Alert.alert(
             'Excluir técnico',
             'Tem certeza que deseja excluir este técnico? Essa ação não pode ser desfeita.',
@@ -140,7 +141,7 @@ export default function ListagemTecnicos() {
                     text: 'Excluir',
                     style: 'destructive',
                     onPress: async () => {
-                        const { error } = await supabase
+                        const { error } = await supabase //delete no banco 
                             .from('tecnico')
                             .delete()
                             .eq('id', id);
@@ -151,7 +152,7 @@ export default function ListagemTecnicos() {
                             return;
                         }
 
-                        fetchTecnicos();
+                        fetchTecnicos();  //atualiza a lista
                     },
                 },
             ]

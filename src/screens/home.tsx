@@ -14,7 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 const menuUser = [
     { label: 'Minhas Ocorrências', icon: 'people-outline', screen: 'TelaList' },
     { label: 'Abrir nova Ocorrência', icon: 'alert-circle-outline', screen: 'TelaOcorrencia' },
-    { label: 'Meu Perfil', icon: 'person-outline', screen: null }, // ainda não criada
+    { label: 'Contatos', icon: 'person-outline', screen: null }, // ainda não criada
     { label: 'Configurações', icon: 'settings-outline', screen: null }, // ainda não criada
 ];
 
@@ -31,11 +31,11 @@ export default function Home() {
     const navigation: any = useNavigation();
     const route: any = useRoute();
 
-    const role = route?.params?.role ?? 'user';
+    const role = route?.params?.role ?? 'user';   // Pega role enviado pelo login
 
     const menuItems = role === 'tecnico' ? menuTecnico : menuUser;
 
-    const handlePress = (screen: string | null) => {
+    const handlePress = (screen: string | null) => {   // Função chamada ao clicar no card
         if (!screen) return;
 
         navigation.navigate(screen);
@@ -57,26 +57,26 @@ export default function Home() {
                         key={`${item.label}-${index}`}
                         style={styles.card}
                         onPress={() => handlePress(item.screen)}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons
-                            name={item.icon as any}
-                            size={28}
-                            color="#0d2b4e"
-                        />
+                        <View style={styles.iconBadge}>
+                            <Ionicons
+                                name={item.icon as any}
+                                size={24}
+                                color="#3a6cb5"
+                            />
+                        </View>
                         <Text style={styles.cardText}>{item.label}</Text>
                     </TouchableOpacity>
                 ))}
             </ScrollView>
 
             <LinearGradient
-                colors={['#3a6cb5', '#5b8bd0', '#a9c6e8']}
-                style={styles.footer}
-            >
-                <Ionicons name="location-outline" size={16} color="#fff" />
-                <Text style={styles.footerText}>
-                    Av Independência, 160, Relvado - RS
-                </Text>
-            </LinearGradient>
+                colors={['#a9c6e8', '#5b8bd0', '#3a6cb5', '#0d2b4e']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.bottomBar}
+            />
         </View>
     );
 }
@@ -115,44 +115,45 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 20,
         marginTop: 60,
+        paddingBottom: 30,
     },
 
     card: {
         width: '47%',
         aspectRatio: 1,
         backgroundColor: '#fff',
-        borderRadius: 16,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
-        shadowColor: '#000',
+        shadowColor: '#0d2b4e',
         shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
         elevation: 3,
     },
 
+    iconBadge: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#eaf2fb',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+
     cardText: {
-        marginTop: 8,
         fontSize: 13,
         fontWeight: '600',
-        color: '#0d2b4e'
-    },
-
-    footer: {
-        height: 160,
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        paddingHorizontal: 20,
-    },
-
-    footerText: {
         color: '#0d2b4e',
-        fontSize: 16,
-        fontWeight: '500',
+        textAlign: 'center',
+        paddingHorizontal: 8,
+    },
+
+    bottomBar: {
+        height: 8,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
     },
 });

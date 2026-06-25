@@ -19,7 +19,7 @@ export default function CadastroTecnico() {
     const [loading, setLoading] = useState(false);
     const [successVisible, setSuccessVisible] = useState(false);
 
-    // --- Competências dinâmicas ---
+    // guarda as competencias
     const [grupoTarefas, setGrupoTarefas] = useState<GrupoTarefa[]>([]);
     const [niveis, setNiveis] = useState<Record<number, number>>({}); // { grupo_tarefa_id: nivel }
     const [loadingGrupos, setLoadingGrupos] = useState(true);
@@ -28,7 +28,7 @@ export default function CadastroTecnico() {
         carregarGrupoTarefas();
     }, []);
 
-    const carregarGrupoTarefas = async () => {
+    const carregarGrupoTarefas = async () => {  //busca o grupo_tarefa do banco
         setLoadingGrupos(true);
 
         const { data, error } = await supabase
@@ -47,11 +47,11 @@ export default function CadastroTecnico() {
         setGrupoTarefas(data ?? []);
     };
 
-    const handleSelecionarNivel = (grupoId: number, nivel: number) => {
+    const handleSelecionarNivel = (grupoId: number, nivel: number) => {    // Salva nível selecionado
         setNiveis((prev) => ({ ...prev, [grupoId]: nivel }));
     };
 
-    const handleOk = () => {
+    const handleOk = () => { //fecha
         setSuccessVisible(false);
         setCpf('');
         setNome('');
@@ -59,7 +59,7 @@ export default function CadastroTecnico() {
         setNiveis({});
     };
 
-    const handleCpfChange = (texto: string) => {
+    const handleCpfChange = (texto: string) => {  // Formata CPF
         let valor = texto.replace(/\D/g, '');
         if (valor.length > 11) valor = valor.slice(0, 11);
 
@@ -75,7 +75,7 @@ export default function CadastroTecnico() {
         setCpf(formatado);
     };
 
-    const handleTelefoneChange = (texto: string) => {
+    const handleTelefoneChange = (texto: string) => {  //formata telefone
         let valor = texto.replace(/\D/g, '');
         if (valor.length > 11) valor = valor.slice(0, 11);
 
@@ -89,13 +89,13 @@ export default function CadastroTecnico() {
         setTelefone(formatado);
     };
 
-    const handleCadastrar = async () => {
+    const handleCadastrar = async () => {  //cadastra o técnico e suas competências
         if (!cpf || !nome || !telefone) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
-        const cpfNumeros = cpf.replace(/\D/g, '');
+        const cpfNumeros = cpf.replace(/\D/g, '');  //tira os caracteres não numéricos do CPF
         if (cpfNumeros.length !== 11) {
             Alert.alert('Erro', 'CPF inválido. Preencha os 11 dígitos.');
             return;
@@ -128,13 +128,13 @@ export default function CadastroTecnico() {
 
         // 2) Insere uma linha em competencia para cada grupo_tarefa selecionado
         if (competenciasSelecionadas.length > 0) {
-            const linhas = competenciasSelecionadas.map(([grupoTarefaId, nivel]) => ({
+            const linhas = competenciasSelecionadas.map(([grupoTarefaId, nivel]) => ({  // Monta array de competências
                 tecnico_id: tecnicoData.id,
                 grupo_tarefa_id: Number(grupoTarefaId),
                 nivel,
             }));
 
-            const { error: competenciaError } = await supabase
+            const { error: competenciaError } = await supabase  //salva no banco
                 .from('competencia')
                 .insert(linhas);
 
@@ -195,8 +195,6 @@ export default function CadastroTecnico() {
                         placeholderTextColor="#9bb3c9"
                     />
                 </View>
-
-                {/* --- Competências dinâmicas, vindas de grupo_tarefa --- */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Competências</Text>
 
